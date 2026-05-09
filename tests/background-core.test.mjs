@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as backgroundCore from "../background-core.mjs";
 
-const { getCandidateTabs } = backgroundCore;
+const { buildExistingTabGroupContext, getCandidateTabs } = backgroundCore;
 
 test("getCandidateTabs keeps only non-pinned http/https tabs", () => {
   const tabs = [
@@ -20,4 +20,41 @@ test("getCandidateTabs keeps only non-pinned http/https tabs", () => {
     getCandidateTabs(tabs).map((tab) => tab.id),
     [1, 2, 8]
   );
+});
+
+test("buildExistingTabGroupContext summarizes current Chrome tab groups in tab order", () => {
+  const groups = buildExistingTabGroupContext(
+    [
+      { id: 1, groupId: 20, title: "PR", url: "https://github.com/a", index: 4 },
+      { id: 2, groupId: -1, title: "Loose", url: "https://example.com", index: 1 },
+      { id: 3, groupId: 10, title: "Docs", url: "https://docs.example.com", index: 2 },
+      { id: 4, groupId: 20, title: "CI", url: "https://github.com/b", index: 5 }
+    ],
+    [
+      { id: 10, title: "Reading", color: "blue", collapsed: true },
+      { id: 20, title: "GitHub Work", color: "green", collapsed: false }
+    ]
+  );
+
+  assert.deepEqual(groups, [
+    {
+      id: 10,
+      title: "Reading",
+      color: "blue",
+      collapsed: true,
+      tabIds: [3],
+      tabs: [{ id: 3, title: "Docs", url: "https://docs.example.com", index: 2 }]
+    },
+    {
+      id: 20,
+      title: "GitHub Work",
+      color: "green",
+      collapsed: false,
+      tabIds: [1, 4],
+      tabs: [
+        { id: 1, title: "PR", url: "https://github.com/a", index: 4 },
+        { id: 4, title: "CI", url: "https://github.com/b", index: 5 }
+      ]
+    }
+  ]);
 });
