@@ -1,4 +1,8 @@
-import { getCandidateTabs } from "./background-core.mjs";
+import {
+  getAutoCloseUnusedTabIds,
+  getCandidateTabs,
+  normalizeAutoCloseUnusedTabsSettings
+} from "./background-core.mjs";
 import {
   TITLE_REWRITE_MAX_LENGTH,
   deriveBatchLabel,
@@ -13,6 +17,8 @@ import "./i18n.js";
 import { SEARCH_PANEL_INJECTION_FILES } from "./search-panel-injection.mjs";
 
 const SEARCH_PANEL_BLOCKED_PROTOCOLS = ["about:", "brave:", "chrome:", "edge:", "vivaldi:"];
+const AUTO_CLOSE_UNUSED_TABS_ALARM = "auto-close-unused-tabs";
+const AUTO_CLOSE_CHECK_PERIOD_MINUTES = 15;
 const i18n = globalThis.AITabI18n;
 
 let organizationState = createIdleState();
@@ -22,8 +28,37 @@ function t(locale, key, vars) {
 }
 
 chrome.runtime.onInstalled.addListener((details) => {
+  configureAutoCloseUnusedTabsAlarm().catch((error) => {
+    console.error("Auto close unused tabs alarm setup failed:", error);
+  });
+
   if (details.reason === "install") {
     chrome.tabs.create({ url: chrome.runtime.getURL("options.html") });
+  }
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  configureAutoCloseUnusedTabsAlarm().catch((error) => {
+    console.error("Auto close unused tabs alarm setup failed:", error);
+  });
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (
+    areaName === "local" &&
+    (changes.autoCloseUnusedTabsEnabled || changes.autoCloseUnusedTabsHours)
+  ) {
+    configureAutoCloseUnusedTabsAlarm().catch((error) => {
+      console.error("Auto close unused tabs alarm setup failed:", error);
+    });
+  }
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm?.name === AUTO_CLOSE_UNUSED_TABS_ALARM) {
+    closeUnusedTabsFromAlarm().catch((error) => {
+      console.error("Auto close unused tabs failed:", error);
+    });
   }
 });
 
@@ -64,6 +99,8 @@ async function handleRuntimeMessage(message) {
       return { ok: true, state: organizationState };
     case "run-ai-organization":
       return await organizeTabsWithAI(message.windowId);
+    case "run-auto-close-unused-tabs":
+      return await closeUnusedTabsFromAlarm();
     case "run-tab-search":
       await openTabSearch();
       return { ok: true };
@@ -544,10 +581,62 @@ async function getAISettings() {
     "aiModel",
     "aiPreference",
     "experimentalTitleRewriteEnabled",
+    "autoCloseUnusedTabsEnabled",
+    "autoCloseUnusedTabsHours",
     i18n.UI_LANGUAGE_STORAGE_KEY
   ]);
 
   return resolveBackgroundAISettings(stored);
+}
+
+async function getAutoCloseUnusedTabsSettings() {
+  const stored = await chrome.storage.local.get([
+    "autoCloseUnusedTabsEnabled",
+    "autoCloseUnusedTabsHours"
+  ]);
+
+  return normalizeAutoCloseUnusedTabsSettings(stored);
+}
+
+async function configureAutoCloseUnusedTabsAlarm() {
+  if (!chrome.alarms?.create || !chrome.alarms?.clear) {
+    return;
+  }
+
+  const settings = await getAutoCloseUnusedTabsSettings();
+
+  if (!settings.enabled) {
+    await chrome.alarms.clear(AUTO_CLOSE_UNUSED_TABS_ALARM);
+    return;
+  }
+
+  await chrome.alarms.create(AUTO_CLOSE_UNUSED_TABS_ALARM, {
+    delayInMinutes: 1,
+    periodInMinutes: AUTO_CLOSE_CHECK_PERIOD_MINUTES
+  });
+}
+
+async function closeUnusedTabsFromAlarm() {
+  const settings = await getAutoCloseUnusedTabsSettings();
+  const { uiLanguage } = await getAISettings();
+
+  if (!settings.enabled) {
+    await chrome.alarms.clear(AUTO_CLOSE_UNUSED_TABS_ALARM);
+    return { ok: false, error: t(uiLanguage, "autoCloseUnusedTabsDisabled") };
+  }
+
+  const tabs = await chrome.tabs.query({});
+  const tabIds = getAutoCloseUnusedTabIds(tabs, Date.now(), settings.thresholdHours);
+
+  if (tabIds.length > 0) {
+    await chrome.tabs.remove(tabIds);
+  }
+
+  return {
+    ok: true,
+    closedCount: tabIds.length,
+    summary: t(uiLanguage, "autoCloseUnusedTabsTestDone", { count: tabIds.length })
+  };
 }
 
 async function getSearchableTabs() {
