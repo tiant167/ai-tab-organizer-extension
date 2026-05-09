@@ -20,7 +20,7 @@ const {
 test("exports the expected preset ids", () => {
   assert.deepEqual(
     AI_PROVIDER_PRESETS.map((item) => item.id),
-    ["openai", "openrouter", "groq", "deepseek", "siliconflow", "dashscope", "custom"]
+    ["openai", "openrouter", "groq", "deepseek", "gemini", "siliconflow", "dashscope", "custom"]
   );
 });
 
@@ -35,6 +35,10 @@ test("normalizes root and versioned compatible endpoints", () => {
     "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
   );
   assert.equal(
+    normalizeAIEndpoint("https://generativelanguage.googleapis.com/v1beta/openai"),
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+  );
+  assert.equal(
     normalizeAIEndpoint("https://api.groq.com/openai/v1/chat/completions"),
     "https://api.groq.com/openai/v1/chat/completions"
   );
@@ -45,6 +49,7 @@ test("detects provider presets from normalized endpoints", () => {
   assert.equal(detectAIProviderPreset("https://openrouter.ai/api/v1"), "openrouter");
   assert.equal(detectAIProviderPreset("https://api.groq.com/openai/v1/chat/completions"), "groq");
   assert.equal(detectAIProviderPreset("https://api.deepseek.com/v1"), "deepseek");
+  assert.equal(detectAIProviderPreset("https://generativelanguage.googleapis.com/v1beta/openai"), "gemini");
   assert.equal(detectAIProviderPreset("https://api.siliconflow.cn/v1/chat/completions"), "siliconflow");
   assert.equal(detectAIProviderPreset("https://dashscope.aliyuncs.com/compatible-mode/v1"), "dashscope");
   assert.equal(detectAIProviderPreset("https://example.com/custom/v1"), "custom");
@@ -61,9 +66,9 @@ test("applies provider presets with recommended endpoint, model, and API key pla
 });
 
 test("returns common model options for a provider", () => {
-  const values = getAIModelOptions("openai").map((item) => item.value);
+  const values = getAIModelOptions("gemini").map((item) => item.value);
 
-  assert.deepEqual(values, ["gpt-4.1-mini", "gpt-4.1", "gpt-4.1-nano", "gpt-4o-mini", "gpt-4o"]);
+  assert.deepEqual(values, ["gemini-3.1-flash-lite", "gemini-3.1-pro-preview", "gemini-2.5-flash"]);
 });
 
 test("keeps known models selected in the model preset dropdown", () => {

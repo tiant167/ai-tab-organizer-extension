@@ -2,6 +2,8 @@ const i18n = globalThis.AITabI18n;
 const runButton = document.getElementById("run-button");
 const searchButton = document.getElementById("search-button");
 const settingsButton = document.getElementById("settings-button");
+const shortcutSettingsButton = document.getElementById("shortcut-settings-button");
+const shortcutWarning = document.getElementById("shortcut-warning");
 const organizeShortcut = document.getElementById("organize-shortcut");
 const searchShortcut = document.getElementById("search-shortcut");
 
@@ -33,6 +35,11 @@ searchButton.addEventListener("click", async () => {
 
 settingsButton.addEventListener("click", async () => {
   await chrome.runtime.openOptionsPage();
+  window.close();
+});
+
+shortcutSettingsButton.addEventListener("click", async () => {
+  await chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
   window.close();
 });
 
@@ -70,12 +77,15 @@ async function renderShortcuts() {
     const commands = await chrome.commands.getAll();
     const organizeCommand = commands.find((item) => item.name === "organize-tabs-ai");
     const searchCommand = commands.find((item) => item.name === "search-tabs");
+    const hasMissingShortcut = !organizeCommand?.shortcut || !searchCommand?.shortcut;
 
-    organizeShortcut.textContent = formatShortcut(organizeCommand?.shortcut, "⌘⇧J");
-    searchShortcut.textContent = formatShortcut(searchCommand?.shortcut, "⌘⇧K");
+    setShortcutState(organizeShortcut, organizeCommand?.shortcut);
+    setShortcutState(searchShortcut, searchCommand?.shortcut);
+    shortcutWarning.classList.toggle("hidden", !hasMissingShortcut);
   } catch (_error) {
-    organizeShortcut.textContent = "⌘⇧J";
-    searchShortcut.textContent = "⌘⇧K";
+    setShortcutState(organizeShortcut, "");
+    setShortcutState(searchShortcut, "");
+    shortcutWarning.classList.remove("hidden");
   }
 }
 
@@ -84,14 +94,23 @@ function renderLocale() {
   document.getElementById("shortcut-title").textContent = i18n.t(currentLocale, "shortcutKeys");
   document.getElementById("organize-shortcut-label").textContent = i18n.t(currentLocale, "organizeTabs");
   document.getElementById("search-shortcut-label").textContent = i18n.t(currentLocale, "searchTabs");
+  document.getElementById("shortcut-warning-copy").textContent = i18n.t(currentLocale, "shortcutConflictHint");
+  shortcutSettingsButton.textContent = i18n.t(currentLocale, "manageShortcuts");
   searchButton.textContent = i18n.t(currentLocale, "openSearchPanel");
   settingsButton.textContent = i18n.t(currentLocale, "settings");
   setRunBusy(false);
 }
 
-function formatShortcut(value, fallback) {
+function setShortcutState(element, value) {
+  const shortcut = String(value || "").trim();
+
+  element.textContent = formatShortcut(shortcut);
+  element.classList.toggle("shortcut-key-missing", !shortcut);
+}
+
+function formatShortcut(value) {
   if (!value) {
-    return fallback;
+    return i18n.t(currentLocale, "shortcutUnassigned");
   }
 
   return value

@@ -27,7 +27,7 @@ function createFakeElement() {
   };
 }
 
-function createExecutionContext() {
+function createExecutionContext(storedSettings = {}) {
   const elementCache = new Map();
   const swatches = [createFakeElement(), createFakeElement()];
 
@@ -72,7 +72,7 @@ function createExecutionContext() {
       },
       storage: {
         local: {
-          get: async () => ({}),
+          get: async () => storedSettings,
           set: async () => {}
         }
       }
@@ -174,4 +174,18 @@ test("options page script can run after content script in the same page scope", 
     vm.runInContext(contentScript, context, { filename: "content.js" });
     vm.runInContext(optionsScript, context, { filename: "options.js" });
   });
+});
+
+test("options page restores the saved provider after provider options are populated", async () => {
+  const optionsScript = fs.readFileSync(path.join(repoRoot, "options.js"), "utf8");
+  const context = createExecutionContext({
+    aiProvider: "gemini",
+    aiEndpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    aiModel: "gemini-3.1-flash-lite"
+  });
+
+  vm.runInContext(optionsScript, context, { filename: "options.js" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(context.document.getElementById("provider-select").value, "gemini");
 });
