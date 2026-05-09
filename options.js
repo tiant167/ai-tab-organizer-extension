@@ -148,6 +148,7 @@ async function initialize() {
 
   const draft = resolveAISettingsDraft(stored, stored[i18n.UI_LANGUAGE_STORAGE_KEY]);
   currentLocale = draft.uiLanguage;
+  populateAIProviderSelect(providerSelect, currentLocale);
   languageSelect.value = currentLocale;
   providerSelect.value = draft.providerId;
   endpointInput.value = draft.endpoint;

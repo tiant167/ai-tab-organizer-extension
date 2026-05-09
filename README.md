@@ -39,6 +39,7 @@
 - OpenRouter
 - Groq
 - DeepSeek
+- Gemini
 - 硅基流动
 - 阿里云百炼（OpenAI 兼容入口）
 - 自定义

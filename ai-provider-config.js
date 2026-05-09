@@ -73,6 +73,19 @@
       ]
     }),
     Object.freeze({
+      id: "gemini",
+      label: "Gemini",
+      localizedLabel: false,
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      defaultModel: "gemini-3.1-flash-lite",
+      apiKeyPlaceholder: "填写 Gemini API Key",
+      models: [
+        { value: "gemini-3.1-flash-lite", label: "gemini-3.1-flash-lite" },
+        { value: "gemini-3.1-pro-preview", label: "gemini-3.1-pro-preview" },
+        { value: "gemini-2.5-flash", label: "gemini-2.5-flash" }
+      ]
+    }),
+    Object.freeze({
       id: "siliconflow",
       label: "硅基流动",
       localizedLabel: true,
@@ -159,7 +172,7 @@
       const segments = pathname.split("/").filter(Boolean);
       const lastSegment = segments[segments.length - 1] || "";
 
-      if (/^v\d+$/i.test(lastSegment)) {
+      if (/^v\d+(?:alpha|beta)?$/i.test(lastSegment) || lastSegment.toLowerCase() === "openai") {
         url.pathname = `/${segments.join("/")}/chat/completions`;
       } else {
         url.pathname = pathname;
